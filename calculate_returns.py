@@ -62,6 +62,22 @@ def calculate_returns():
                 earnings_date = parse_date_from_filename(filename)
                 
                 if earnings_date:
+                    quarter = None
+                    # Try to extract quarter from file content
+                    try:
+                        file_path = os.path.join(ticker_dir, filename)
+                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                            # Read first 20 lines
+                            lines = [f.readline() for _ in range(20)]
+                            quarter_pattern = re.compile(r'(Q[1-4]\s+\d{4})')
+                            for line in lines:
+                                match = quarter_pattern.search(line)
+                                if match:
+                                    quarter = match.group(1)
+                                    break
+                    except Exception as e:
+                        print(f"Error reading quarter from {filename}: {e}")
+
                     # Logic to find Quarter (we could parse file, but maybe just filename/date is enough for now)
                     # The user asked for "earnings return csv for each company"
                     
@@ -108,6 +124,7 @@ def calculate_returns():
                         
                         results.append({
                             'ticker': ticker,
+                            'quarter': quarter,
                             'earnings_date': earnings_date, # This is the trading date used (t=0)
                             'original_filename': filename,
                             '1_day_return': ret_1d,

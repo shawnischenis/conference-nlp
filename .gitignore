@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# Data Directories (generated or large files)
+StockData/
+ParsedTranscripts/
+TranscriptFeatures/
+EarningsReturns/
+# Keep Transcripts folder structure but maybe ignore contents if large?
+# For now, let's assume we want to keep the Transcripts folder itself but maybe not all data if it's huge.
+# User said "clean up ... to make this github publishable". Usually data is not committed.
+Transcripts/*
+!Transcripts/.keep
+
+# Mac
+.DS_Store
