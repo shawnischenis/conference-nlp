@@ -27,7 +27,19 @@ The workflow consists of four main stages:
     python3 parse_transcripts.py
     python3 analyze_transcripts.py
     python3 calculate_returns.py
+    python3 calculate_returns.py
     ```
+5.  **RAG System (Question Answering)**:
+    *   **Index Data**: First, build the search index from your processed transcripts (requires `OPENAI_API_KEY`).
+        ```bash
+        export OPENAI_API_KEY="your-api-key-here"
+        python3 rag_indexer.py
+        ```
+    *   **Query**: Ask questions in natural language.
+        ```bash
+        python3 rag_query.py "What drove the negative tone in NVDA Q3 2019?"
+        ```
+        *Filters supported: Ticker, Quarter, Section, Returns (e.g., "-5% next day returns").*
 3.  **Analysis**:
     *   Open `industryEDA-2.ipynb` to view the exploratory data analysis and visualizations.
 
