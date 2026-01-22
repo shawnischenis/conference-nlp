@@ -6,6 +6,10 @@ import pickle
 import re
 from openai import OpenAI
 from sklearn.metrics.pairwise import cosine_similarity
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 # --- Configuration ---
 TRANSCRIPTS_DIR = 'ParsedTranscripts'
