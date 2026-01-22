@@ -30,7 +30,7 @@ The workflow consists of four main stages:
     python3 calculate_returns.py
     ```
 5.  **RAG System (Question Answering)**:
-    *   **Index Data**: First, build the search index from your processed transcripts (requires `OPENAI_API_KEY`).
+    *   **Index Data**: The search index (`rag_index.pkl`) is not included in the repository due to size. You must generate it locally from your processed transcripts (requires `OPENAI_API_KEY`).
         ```bash
         export OPENAI_API_KEY="your-api-key-here"
         python3 rag_indexer.py
