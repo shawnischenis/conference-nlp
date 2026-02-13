@@ -41,7 +41,7 @@ def fetch_stock_data():
                 hist.to_csv(output_file)
                 print(f"Saved {ticker} data to {output_file}")
                 
-            # Be nice to the API
+            # don't spam API
             time.sleep(1)
             
         except Exception as e:
