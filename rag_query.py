@@ -5,12 +5,12 @@ import numpy as np
 from openai import OpenAI
 from sklearn.metrics.pairwise import cosine_similarity
 from dotenv import load_dotenv
-
-load_dotenv()
-
 import re
 import argparse
 import json
+from typing import Dict, Any, List, Optional
+
+load_dotenv()
 
 # --- Configuration ---
 INDEX_FILE = 'rag_index.pkl'
@@ -23,8 +23,8 @@ try:
     client = OpenAI()
 except Exception as e:
     print(f"Error initializing OpenAI client: {e}")
-    print("Ensure OPENAI_API_KEY is set.")
-    exit(1)
+    # print("Ensure OPENAI_API_KEY is set.")
+    client = None
 
 def load_index():
     if not os.path.exists(INDEX_FILE):
@@ -34,6 +34,8 @@ def load_index():
         return pickle.load(f)
 
 def get_embedding(text):
+    if not client:
+        return [0.0] * 1536
     text = text.replace("\n", " ")
     try:
         return client.embeddings.create(input=[text], model=EMBEDDING_MODEL).data[0].embedding
@@ -46,6 +48,9 @@ def interpret_query(query):
     Uses LLM to extract structured filters from the natural language query.
     Returns a dictionary of filters and the core semantic search query.
     """
+    if not client:
+        return {"filters": {}, "search_query": query}
+
     system_prompt = """
     You are a query parser for an earnings call RAG system.
     Extract filters and the core search text from the user's query.
@@ -113,54 +118,70 @@ def filter_data(data, filters):
         filtered_data.append(item)
     return filtered_data
 
-def search(query):
+def query_rag(query: str) -> Dict[str, Any]:
+    """
+    Executes the RAG pipeline for a given query.
+    Returns a dictionary with the answer, context items, and metadata.
+    """
+    if not client:
+        return {"error": "OpenAI client not initialized (check API key)."}
+
     data = load_index()
     if not data:
-        return
+        return {"error": f"Index file '{INDEX_FILE}' not found."}
 
     print(f"Interpreting query: '{query}'...")
     parsed = interpret_query(query)
     filters = parsed.get('filters', {})
     search_text = parsed.get('search_query', query)
     
-    print(f"Filters: {filters}")
-    print(f"Semantic Query: '{search_text}'")
-    
     # 1. Filter
     filtered_data = filter_data(data, filters)
-    print(f"Found {len(filtered_data)} potential chunks after filtering.")
     
     if not filtered_data:
-        print("No matching data found with current filters.")
-        return
+        return {
+            "answer": "No matching data found with the inferred filters.",
+            "filters": filters,
+            "context": []
+        }
 
     # 2. Rank by Embedding Similarity
     query_embedding = get_embedding(search_text)
     
-    # Calculate similarities
-    # Optimization: Convert filtered_data embeddings to matrix if large, but list loop is okay for <10k chunks
-    
     similarities = []
-    for i, item in enumerate(filtered_data):
+    for item in filtered_data:
         sim = cosine_similarity([query_embedding], [item['embedding']])[0][0]
         similarities.append((sim, item))
         
-    # Sort
     similarities.sort(key=lambda x: x[0], reverse=True)
     top_results = similarities[:TOP_K]
     
     # 3. Generate Answer
+    context_items = []
     context_text = ""
     for score, item in top_results:
-        context_text += f"\n---\n[Ticker: {item['ticker']}, Quarter: {item['quarter']}, Return 1D: {item['return_1d']}]\n{item['text']}\n"
+        # Prepare context for LLM
+        c_text = f"\n---\n[Ticker: {item['ticker']}, Quarter: {item['quarter']}, Return 1D: {item['return_1d']}]\n{item['text']}\n"
+        context_text += c_text
         
-    print("\ngenerating answer...")
+        # Prepare context for return object
+        context_items.append({
+            "ticker": item['ticker'],
+            "quarter": item['quarter'],
+            "return_1d": item['return_1d'],
+            "text": item['text'],
+            "score": float(score),
+            "section": item.get('section', 'unknown')
+        })
+        
+    print("Generating answer...")
     
     system_prompt = f"""
     You are a financial analyst assistant. 
     Answer the user's question based ONLY on the provided context chunks from earnings calls.
     If the context doesn't answer the question, say so.
     Cite specific quotes where possible.
+    Format your answer in Markdown.
     """
     
     try:
@@ -171,12 +192,30 @@ def search(query):
                 {"role": "user", "content": f"Context:\n{context_text}\n\nQuestion: {query}"}
             ]
         )
-        print("\n=== ANSWER ===\n")
-        print(response.choices[0].message.content)
-        print("\n==============")
+        answer = response.choices[0].message.content
+        
+        return {
+            "answer": answer,
+            "filters": filters,
+            "context": context_items
+        }
         
     except Exception as e:
         print(f"Error generating answer: {e}")
+        return {"error": f"Error generating answer: {str(e)}"}
+
+def search(query):
+    """Legacy CLI entry point"""
+    result = query_rag(query)
+    
+    if "error" in result:
+        print(result["error"])
+        return
+
+    print(f"\nFilters: {result.get('filters')}")
+    print("\n=== ANSWER ===\n")
+    print(result.get("answer"))
+    print("\n==============")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='RAG Query Interface')
